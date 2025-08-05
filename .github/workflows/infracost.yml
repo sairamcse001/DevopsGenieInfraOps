@@ -22,7 +22,7 @@ jobs:
       - name: Run Infracost and generate JSON
         run: |
           infracost breakdown \
-            --path=terraform \
+            --path=terraform/generated \
             --format=json \
             --out-file=infracost-output.json
 
