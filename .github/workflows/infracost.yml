@@ -31,13 +31,10 @@ jobs:
 
       - name: Print GitHub PR and Infracost Output
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            pr_number="${{ github.event.pull_request.number }}"
-          else
-            pr_url="${{ github.event.issue.pull_request.url }}"
-            pr_number=$(echo $pr_url | grep -o '[0-9]*$')
-          fi
+          pr_number="${{ github.event.pull_request.number }}"
+          repo="${{ github.repository }}"
 
+          echo "📦 Repository: $repo"
           echo "🔢 PR Number: $pr_number"
           echo "💸 Infracost Output:"
           cat infracost-output.json
