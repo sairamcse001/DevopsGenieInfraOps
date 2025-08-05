@@ -55,8 +55,10 @@ jobs:
           comments=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/issues/$pr_number/comments")
 
-          infracost_comment=$(echo "$comments" | jq -r '.[] | select(.user.login=="infracost[bot]") | .body' | head -n 1)
+          echo "$comments"
 
+          infracost_comment=$(echo "$comments" | jq -r '.[] | select(.user.login=="infracost[bot]") | .body' | head -n 1)
+          echo "$infracost_comment"
           if [ -z "$infracost_comment" ]; then
             echo "No Infracost bot comment found."
             exit 1
@@ -64,7 +66,7 @@ jobs:
 
           echo "$infracost_comment" > comment.html
           echo "------ BEGIN Infracost comment HTML ------"
-          printf '%s\n' "$infracost_comment"
+          echo "$infracost_comment"
           echo "------- END Infracost comment HTML -------"
 
           # Set output using environment files (new syntax)
