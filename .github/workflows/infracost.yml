@@ -75,7 +75,7 @@ jobs:
             const cheerio = require('cheerio');
             let html = fs.readFileSync('comment.html', 'utf8');
 
-            const markdownCommentRegex = /^\\[\\/\\/\\]: <> \\(.*?\\)\\n?/;
+            const markdownCommentRegex = /^\[\/\/\]: <> \(.*?\)\n?/;
             const cleanedHtml = html.replace(markdownCommentRegex, '');
 
             console.log('📄 Raw cleaned HTML content:');
