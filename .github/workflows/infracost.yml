@@ -35,26 +35,3 @@ jobs:
           echo "🔢 PR Number: $pr_number"
           echo "💸 Infracost Output:"
           cat infracost-output.json
-
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: Fetch Infracost PR comment
-        env:
-          GITHUB_TOKEN: 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
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPO: ${{ github.repository }}
-        run: |
-          echo "Fetching latest Infracost comment from PR #$PR_NUMBER"
-
-          comments=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/$REPO/issues/$PR_NUMBER/comments")
-
-          infracost_comment=$(echo "$comments" | jq -r '.[] | select(.user.login=="infracost[bot]") | .body' | head -n 1)
-
-          if [ -z "$infracost_comment" ]; then
-            echo "No Infracost comment found on PR #$PR_NUMBER"
-          else
-            echo "----- Infracost PR Comment -----"
-            echo "$infracost_comment"
-          fi
