@@ -65,15 +65,24 @@ jobs:
           echo "$infracost_comment" > comment.html
           echo "::set-output name=comment_file::comment.html"
 
-      - name: Parse Infracost Comment HTML to JSON
+      - name: Parse Infracost Comment HTML to JSON and print raw HTML
         run: |
           npm install cheerio
 
           node -e "
             const fs = require('fs');
             const cheerio = require('cheerio');
-            const html = fs.readFileSync('comment.html', 'utf8');
-            const \$ = cheerio.load(html, { decodeEntities: false });
+            let html = fs.readFileSync('comment.html', 'utf8');
+
+            // Remove markdown comment line at the start
+            const markdownCommentRegex = /^\[\/\/\]: <> \(.*?\)\n?/;
+            const cleanedHtml = html.replace(markdownCommentRegex, '');
+
+            // Print raw cleaned HTML
+            console.log('📄 Raw cleaned HTML content:');
+            console.log(cleanedHtml);
+
+            const \$ = cheerio.load(cleanedHtml, { decodeEntities: false });
 
             function parseNode(node) {
               if (node.type === 'text') {
