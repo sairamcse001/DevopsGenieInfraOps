@@ -55,10 +55,8 @@ jobs:
           comments=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/issues/$pr_number/comments")
 
-          echo "$comments"
           infracost_comment=$(echo "$comments" | jq -r '.[0].body')
-          
-          echo "$infracost_comment"
+
           if [ -z "$infracost_comment" ]; then
             echo "No Infracost bot comment found."
             exit 1
@@ -69,7 +67,6 @@ jobs:
           echo "$infracost_comment"
           echo "------- END Infracost comment HTML -------"
 
-          # Set output using environment files (new syntax)
           echo "comment_file=comment.html" >> $GITHUB_OUTPUT
 
       - name: Parse Infracost Comment HTML to JSON and print raw HTML
@@ -79,17 +76,23 @@ jobs:
           node -e "
             const fs = require('fs');
             const cheerio = require('cheerio');
+
             let html = fs.readFileSync('comment.html', 'utf8');
 
             // Remove markdown comment line at the start if present
             const markdownCommentRegex = /^\[\/\/\]: <> \(.*?\)\n?/;
             const cleanedHtml = html.replace(markdownCommentRegex, '');
 
-            // Print raw cleaned HTML
             console.log('📄 Raw cleaned HTML content:');
             console.log(cleanedHtml);
 
             const \$ = cheerio.load(cleanedHtml, { decodeEntities: false });
+
+            function getTextFromNode(node) {
+              if (node.type === 'text') return node.data.trim();
+              if (!node.children) return '';
+              return node.children.map(getTextFromNode).join(' ').trim();
+            }
 
             function parseNode(node) {
               if (node.type === 'text') {
@@ -97,7 +100,23 @@ jobs:
                 if (text) return text;
                 return null;
               }
+
               if (node.type === 'tag') {
+                // Only parse tables that have 'FinOps policies' in first <tr><td>
+                if (node.name === 'table') {
+                  const firstTr = node.children.find(c => c.type === 'tag' && c.name === 'tr');
+                  if (firstTr) {
+                    const firstTd = firstTr.children.find(c => c.type === 'tag' && c.name === 'td');
+                    if (firstTd) {
+                      const tdText = getTextFromNode(firstTd);
+                      if (!tdText.includes('FinOps policies')) {
+                        // Skip non-FinOps tables
+                        return null;
+                      }
+                    }
+                  }
+                }
+
                 const obj = { tag: node.name, attrs: node.attribs || {} };
                 const children = [];
                 node.children.forEach(c => {
