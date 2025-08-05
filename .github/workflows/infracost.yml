@@ -1,6 +1,8 @@
 name: Infracost PR Analysis
 
 on:
+  issue_comment:
+    types: [created]
   pull_request:
     paths:
       - 'terraform/**'
@@ -8,6 +10,7 @@ on:
 
 jobs:
   infracost:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.event.issue.pull_request
     runs-on: ubuntu-latest
 
     steps:
@@ -17,7 +20,7 @@ jobs:
       - name: Setup Infracost
         uses: infracost/actions/setup@v2
         with:
-          api-key: ics_v1_0EYAc3KF1KDTdwcVGiFemY_NTLN0pGEqFspCecg7pUoHjraFjhLRwtik5Lkfj6dOtnBHH45T
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
 
       - name: Run Infracost and generate JSON
         run: |
@@ -28,10 +31,29 @@ jobs:
 
       - name: Print GitHub PR and Infracost Output
         run: |
-          pr_number="${{ github.event.pull_request.number }}"
-          repo="${{ github.repository }}"
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            pr_number="${{ github.event.pull_request.number }}"
+          else
+            pr_url="${{ github.event.issue.pull_request.url }}"
+            pr_number=$(echo $pr_url | grep -o '[0-9]*$')
+          fi
 
-          echo "📦 Repository: $repo"
           echo "🔢 PR Number: $pr_number"
           echo "💸 Infracost Output:"
           cat infracost-output.json
+
+      - name: Get PR Comments using GitHub API
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            pr_number="${{ github.event.pull_request.number }}"
+          else
+            pr_url="${{ github.event.issue.pull_request.url }}"
+            pr_number=$(echo $pr_url | grep -o '[0-9]*$')
+          fi
+
+          echo "📥 Fetching comments for PR #$pr_number"
+          curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/$pr_number/comments" \
+            | jq '.[] | {user: .user.login, comment: .body}' || echo "❌ Failed to fetch comments"
