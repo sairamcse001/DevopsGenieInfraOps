@@ -1,8 +1,6 @@
 name: Infracost PR Analysis
 
 on:
-  issue_comment:
-    types: [created]
   workflow_dispatch:
   pull_request:
     paths:
@@ -37,38 +35,7 @@ jobs:
           echo "🔢 PR Number: $pr_number"
           echo "💸 Infracost Output:"
           cat infracost-output.json
-
-      - name: Get Infracost Bot Comment and Save HTML
-        id: fetch_comment
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            pr_number="${{ github.event.pull_request.number }}"
-          else
-            pr_url="${{ github.event.issue.pull_request.url }}"
-            pr_number=$(echo $pr_url | grep -o '[0-9]*$')
-          fi
-
-          echo "📥 Fetching comments for PR #$pr_number"
-          comments=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/$pr_number/comments")
-
-          infracost_comment=$(echo "$comments" | jq -r '.[0].body')
-
-          echo "$infracost_comment"
-          if [ -z "$infracost_comment" ]; then
-            echo "No Infracost bot comment found."
-            exit 1
-          fi
-
-          echo "$infracost_comment" > comment.html
-          echo "------ BEGIN Infracost comment HTML ------"
-          echo "$infracost_comment"
-          echo "------- END Infracost comment HTML -------"
-
-          echo "comment_file=comment.html" >> $GITHUB_OUTPUT
-
+          
       - name: Send data to public ServiceNow scripted REST API
         env:
           SERVICENOW_API_URL: https://hackai.service-now.com/api/x_snc_devops_genie/devopscostdetails
@@ -76,12 +43,10 @@ jobs:
           echo "Sending Infracost comment and JSON to public ServiceNow API..."
 
           COMMENT_CONTENT=$(cat comment.html | jq -Rs .)  # JSON string
-          INFRACOST_JSON=$(cat infracost-output.json)
 
           PAYLOAD=$(jq -n \
             --arg comment "$COMMENT_CONTENT" \
-            --argjson infracost "$INFRACOST_JSON" \
-            '{insta_comments: $comment, infrast_json: $infracost}')
+            '{insta_comments: $comment}')
 
           curl -s -X POST "$SERVICENOW_API_URL" \
             -H "Content-Type: application/json" \
