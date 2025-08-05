@@ -52,10 +52,6 @@ jobs:
           fi
 
           echo "📥 Fetching comments for PR #$pr_number"
-          curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/$pr_number/comments" \
-            | jq '.[] | {user: .user.login, comment: .body}' || echo "❌ Failed to fetch comments"
-            
           comments=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/issues/$pr_number/comments")
 
@@ -67,13 +63,12 @@ jobs:
           fi
 
           echo "$infracost_comment" > comment.html
-          echo "::set-output name=comment_file::comment.html"
           echo "------ BEGIN Infracost comment HTML ------"
           printf '%s\n' "$infracost_comment"
           echo "------- END Infracost comment HTML -------"
-          
-          printf '%s\n' "$infracost_comment" > comment.html
-          echo "::set-output name=comment_file::comment.html"
+
+          # Set output using environment files (new syntax)
+          echo "comment_file=comment.html" >> $GITHUB_OUTPUT
 
       - name: Parse Infracost Comment HTML to JSON and print raw HTML
         run: |
@@ -84,7 +79,7 @@ jobs:
             const cheerio = require('cheerio');
             let html = fs.readFileSync('comment.html', 'utf8');
 
-            // Remove markdown comment line at the start
+            // Remove markdown comment line at the start if present
             const markdownCommentRegex = /^\[\/\/\]: <> \(.*?\)\n?/;
             const cleanedHtml = html.replace(markdownCommentRegex, '');
 
@@ -117,6 +112,6 @@ jobs:
             const json = parseNode(rootNode);
 
             fs.writeFileSync('comment.json', JSON.stringify(json, null, 2));
-            console.log('✅ Parsed Infracost comment to comment.json');
+            console.log('Parsed Infracost comment to comment.json');
             console.log(JSON.stringify(json, null, 2));
           "
