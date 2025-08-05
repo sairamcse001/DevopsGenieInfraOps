@@ -39,7 +39,8 @@ jobs:
           echo "💸 Infracost Output:"
           cat infracost-output.json
 
-      - name: Get PR Comments using GitHub API
+      - name: Get Infracost Bot Comment and Save HTML
+        id: fetch_comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -51,6 +52,52 @@ jobs:
           fi
 
           echo "📥 Fetching comments for PR #$pr_number"
-          curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/$pr_number/comments" \
-            | jq '.[] | {user: .user.login, comment: .body}' || echo "❌ Failed to fetch comments"
+          comments=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/issues/$pr_number/comments")
+
+          infracost_comment=$(echo "$comments" | jq -r '.[] | select(.user.login=="infracost[bot]") | .body' | head -n 1)
+
+          if [ -z "$infracost_comment" ]; then
+            echo "No Infracost bot comment found."
+            exit 1
+          fi
+
+          echo "$infracost_comment" > comment.html
+          echo "::set-output name=comment_file::comment.html"
+
+      - name: Parse Infracost Comment HTML to JSON
+        run: |
+          npm install cheerio
+
+          node -e "
+            const fs = require('fs');
+            const cheerio = require('cheerio');
+            const html = fs.readFileSync('comment.html', 'utf8');
+            const \$ = cheerio.load(html, { decodeEntities: false });
+
+            function parseNode(node) {
+              if (node.type === 'text') {
+                const text = node.data.trim();
+                if (text) return text;
+                return null;
+              }
+              if (node.type === 'tag') {
+                const obj = { tag: node.name, attrs: node.attribs || {} };
+                const children = [];
+                node.children.forEach(c => {
+                  const child = parseNode(c);
+                  if (child !== null && child !== '') children.push(child);
+                });
+                if (children.length) obj.children = children;
+                return obj;
+              }
+              return null;
+            }
+
+            const rootNode = \$('body').get(0) || \$.root().get(0);
+            const json = parseNode(rootNode);
+
+            fs.writeFileSync('comment.json', JSON.stringify(json, null, 2));
+            console.log('✅ Parsed Infracost comment to comment.json');
+            console.log(JSON.stringify(json, null, 2));
+          "
