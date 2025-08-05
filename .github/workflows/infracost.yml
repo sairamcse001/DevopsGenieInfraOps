@@ -69,7 +69,7 @@ jobs:
 
       - name: Send data to public ServiceNow scripted REST API
         env:
-          SERVICENOW_API_URL: https://your-instance.service-now.com/api/your_namespace/your_api
+          SERVICENOW_API_URL: https://hackai.service-now.com/api/x_snc_devops_genie/devopscostdetails
         run: |
           echo "Sending Infracost comment and JSON to public ServiceNow API..."
 
