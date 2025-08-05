@@ -54,7 +54,7 @@ jobs:
 
           echo "$comments"
           infracost_comment=$(echo "$comments" | jq -r '.[0].body')
-          
+
           echo "$infracost_comment"
           if [ -z "$infracost_comment" ]; then
             echo "No Infracost bot comment found."
@@ -68,127 +68,15 @@ jobs:
 
           echo "comment_file=comment.html" >> $GITHUB_OUTPUT
 
-      - name: Parse Infracost Comment HTML to JSON and extract FinOps policies
+      - name: Extract and print first table from Infracost comment HTML
         run: |
           npm install cheerio
-
           node -e "
             const fs = require('fs');
             const cheerio = require('cheerio');
-            let html = fs.readFileSync('comment.html', 'utf8');
-
-            // Remove markdown comment line at the start if present
-            const markdownCommentRegex = /^\[\/\/\]: <> \(.*?\)\n?/;
-            const cleanedHtml = html.replace(markdownCommentRegex, '');
-
-            const \$ = cheerio.load(cleanedHtml, { decodeEntities: false });
-
-            function parseNode(node) {
-              if (node.type === 'text') {
-                const text = node.data.trim();
-                if (text) return text;
-                return null;
-              }
-              if (node.type === 'tag') {
-                const obj = { tag: node.name, attrs: node.attribs || {} };
-                const children = [];
-                node.children.forEach(c => {
-                  const child = parseNode(c);
-                  if (child !== null && child !== '') children.push(child);
-                });
-                if (children.length) obj.children = children;
-                return obj;
-              }
-              return null;
-            }
-
-            const rootNode = \$('body').get(0) || \$.root().get(0);
-            const json = parseNode(rootNode);
-
-            fs.writeFileSync('comment.json', JSON.stringify(json, null, 2));
-            console.log('Parsed Infracost comment to comment.json');
-
-            // Function to find first table with "FinOps policies"
-            function findTables(node) {
-              let tables = [];
-              if (!node) return tables;
-              if (node.tag === 'table') tables.push(node);
-              if (node.children) {
-                node.children.forEach(c => {
-                  tables = tables.concat(findTables(c));
-                });
-              }
-              return tables;
-            }
-
-            function tableHasFinOpsTitle(tableNode) {
-              if (!tableNode.children) return false;
-              for (const tr of tableNode.children) {
-                if (tr.tag === 'tr' && tr.children) {
-                  for (const td of tr.children) {
-                    if (td.tag === 'td' && td.children) {
-                      for (const child of td.children) {
-                        if (typeof child === 'string' && child.includes('FinOps policies')) {
-                          return true;
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-              return false;
-            }
-
-            const tables = findTables(json);
-            const finOpsTable = tables.find(tableHasFinOpsTitle);
-
-            if (!finOpsTable) {
-              console.log('No FinOps policies table found');
-              process.exit(1);
-            }
-
-            // Extract policies: summary + description text inside <details>
-            const trs = finOpsTable.children.filter(c => c.tag === 'tr');
-            let policies = [];
-
-            for (let i = 0; i < trs.length; i++) {
-              const tr = trs[i];
-              if (!tr.children) continue;
-              const tdWithDetails = tr.children.find(td => td.tag === 'td' && td.children && td.children.some(c => typeof c === 'object' && c.tag === 'details'));
-              if (tdWithDetails) {
-                const detailsNode = tdWithDetails.children.find(c => typeof c === 'object' && c.tag === 'details');
-                if (detailsNode && detailsNode.children) {
-                  // summary text from <summary><b>...</b></summary>
-                  const summaryNode = detailsNode.children.find(c => c.tag === 'summary');
-                  let summaryText = '';
-                  if (summaryNode && summaryNode.children) {
-                    summaryText = summaryNode.children.map(ch => {
-                      if (typeof ch === 'string') return ch.trim();
-                      if (ch.tag === 'b' && ch.children) return ch.children.join('').trim();
-                      return '';
-                    }).join(' ').trim();
-                  }
-
-                  // description text after <br/>
-                  let descText = '';
-                  const brIndex = detailsNode.children.findIndex(c => c.tag === 'br');
-                  if (brIndex !== -1) {
-                    for (let j = brIndex + 1; j < detailsNode.children.length; j++) {
-                      const c = detailsNode.children[j];
-                      if (typeof c === 'string') descText += c.trim() + ' ';
-                      else if (c.children) {
-                        descText += c.children.filter(x => typeof x === 'string').join(' ') + ' ';
-                      }
-                    }
-                  }
-
-                  policies.push({summary: summaryText, description: descText.trim()});
-                }
-              }
-            }
-
-            // Print policies in desired format
-            policies.forEach(p => {
-              console.log(`“${p.summary}” : ${p.description}\n`);
-            });
+            const html = fs.readFileSync('comment.html', 'utf8');
+            const $ = cheerio.load(html, { decodeEntities: false });
+            const firstTable = $('table').first();
+            // Print the full table HTML including the <table> tag itself
+            console.log('<table>' + firstTable.html() + '</table>');
           "
