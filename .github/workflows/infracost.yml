@@ -41,7 +41,7 @@ jobs:
 
       - name: Fetch Infracost PR comment
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ico-WQ4HmGyZVYTLU8Rl8wkedjxpItBsfNma
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
         run: |
