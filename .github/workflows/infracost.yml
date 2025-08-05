@@ -62,11 +62,7 @@ jobs:
             exit 1
           fi
 
-          echo "$infracost_comment" > comment.html
-          echo "------ BEGIN Infracost comment HTML ------"
-          echo "$infracost_comment"
-          echo "------- END Infracost comment HTML -------"
-
+          # Set output using environment files (new syntax)
           echo "comment_file=comment.html" >> $GITHUB_OUTPUT
 
       - name: Parse Infracost Comment HTML to JSON and print raw HTML
@@ -76,23 +72,17 @@ jobs:
           node -e "
             const fs = require('fs');
             const cheerio = require('cheerio');
-
             let html = fs.readFileSync('comment.html', 'utf8');
 
             // Remove markdown comment line at the start if present
             const markdownCommentRegex = /^\[\/\/\]: <> \(.*?\)\n?/;
             const cleanedHtml = html.replace(markdownCommentRegex, '');
 
+            // Print raw cleaned HTML
             console.log('📄 Raw cleaned HTML content:');
             console.log(cleanedHtml);
 
             const \$ = cheerio.load(cleanedHtml, { decodeEntities: false });
-
-            function getTextFromNode(node) {
-              if (node.type === 'text') return node.data.trim();
-              if (!node.children) return '';
-              return node.children.map(getTextFromNode).join(' ').trim();
-            }
 
             function parseNode(node) {
               if (node.type === 'text') {
@@ -101,47 +91,6 @@ jobs:
                 return null;
               }
               if (node.type === 'tag') {
-                // Check if this node is a <table>
-                if (node.name === 'table') {
-                  // Find first <tr><td> text inside this table
-                  const firstTr = node.children.find(n => n.type === 'tag' && n.name === 'tr');
-                  if (firstTr) {
-                    const firstTd = firstTr.children.find(n => n.type === 'tag' && n.name === 'td');
-                    if (firstTd) {
-                      // Extract the text inside that td
-                      let tdText = '';
-                      firstTd.children.forEach(child => {
-                        if (child.type === 'text') tdText += child.data;
-                        else if (child.type === 'tag' && child.children) {
-                          child.children.forEach(grandchild => {
-                            if (grandchild.type === 'text') tdText += grandchild.data;
-                          });
-                        }
-                      });
-                      tdText = tdText.trim();
-            
-                      // Check for FinOps policies text
-                      if (tdText.includes('FinOps policies')) {
-                        // This is the table we want — parse fully and return
-                        const obj = { tag: node.name, attrs: node.attribs || {} };
-                        const children = [];
-                        node.children.forEach(c => {
-                          const child = parseNode(c);
-                          if (child !== null && child !== '') children.push(child);
-                        });
-                        if (children.length) obj.children = children;
-                        return obj;
-                      } else {
-                        // This is a different table, skip it
-                        return null;
-                      }
-                    }
-                  }
-                  // No tr/td found, skip this table
-                  return null;
-                }
-            
-                // For other tags (non-table), parse normally
                 const obj = { tag: node.name, attrs: node.attribs || {} };
                 const children = [];
                 node.children.forEach(c => {
@@ -153,7 +102,6 @@ jobs:
               }
               return null;
             }
-
 
             const rootNode = \$('body').get(0) || \$.root().get(0);
             const json = parseNode(rootNode);
