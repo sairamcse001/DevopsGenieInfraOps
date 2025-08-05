@@ -1,5 +1,3 @@
-
-
 name: Infracost PR Analysis
 
 on:
@@ -68,10 +66,9 @@ jobs:
           echo "$infracost_comment"
           echo "------- END Infracost comment HTML -------"
 
-          # Set output using environment files (new syntax)
           echo "comment_file=comment.html" >> $GITHUB_OUTPUT
 
-      - name: Parse Infracost Comment HTML to JSON and print raw HTML
+      - name: Parse Infracost Comment HTML to JSON and extract FinOps policies
         run: |
           npm install cheerio
 
@@ -81,12 +78,8 @@ jobs:
             let html = fs.readFileSync('comment.html', 'utf8');
 
             // Remove markdown comment line at the start if present
-            const markdownCommentRegex = /^\[\/\/\]: <> \(.*?\)\n?/;
+            const markdownCommentRegex = /^\\[\\/\\/\\]: <> \\(.*?\\)\\n?/;
             const cleanedHtml = html.replace(markdownCommentRegex, '');
-
-            // Print raw cleaned HTML
-            console.log('📄 Raw cleaned HTML content:');
-            console.log(cleanedHtml);
 
             const \$ = cheerio.load(cleanedHtml, { decodeEntities: false });
 
@@ -114,5 +107,88 @@ jobs:
 
             fs.writeFileSync('comment.json', JSON.stringify(json, null, 2));
             console.log('Parsed Infracost comment to comment.json');
-            console.log(JSON.stringify(json, null, 2));
+
+            // Function to find first table with "FinOps policies"
+            function findTables(node) {
+              let tables = [];
+              if (!node) return tables;
+              if (node.tag === 'table') tables.push(node);
+              if (node.children) {
+                node.children.forEach(c => {
+                  tables = tables.concat(findTables(c));
+                });
+              }
+              return tables;
+            }
+
+            function tableHasFinOpsTitle(tableNode) {
+              if (!tableNode.children) return false;
+              for (const tr of tableNode.children) {
+                if (tr.tag === 'tr' && tr.children) {
+                  for (const td of tr.children) {
+                    if (td.tag === 'td' && td.children) {
+                      for (const child of td.children) {
+                        if (typeof child === 'string' && child.includes('FinOps policies')) {
+                          return true;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              return false;
+            }
+
+            const tables = findTables(json);
+            const finOpsTable = tables.find(tableHasFinOpsTitle);
+
+            if (!finOpsTable) {
+              console.log('No FinOps policies table found');
+              process.exit(1);
+            }
+
+            // Extract policies: summary + description text inside <details>
+            const trs = finOpsTable.children.filter(c => c.tag === 'tr');
+            let policies = [];
+
+            for (let i = 0; i < trs.length; i++) {
+              const tr = trs[i];
+              if (!tr.children) continue;
+              const tdWithDetails = tr.children.find(td => td.tag === 'td' && td.children && td.children.some(c => typeof c === 'object' && c.tag === 'details'));
+              if (tdWithDetails) {
+                const detailsNode = tdWithDetails.children.find(c => typeof c === 'object' && c.tag === 'details');
+                if (detailsNode && detailsNode.children) {
+                  // summary text from <summary><b>...</b></summary>
+                  const summaryNode = detailsNode.children.find(c => c.tag === 'summary');
+                  let summaryText = '';
+                  if (summaryNode && summaryNode.children) {
+                    summaryText = summaryNode.children.map(ch => {
+                      if (typeof ch === 'string') return ch.trim();
+                      if (ch.tag === 'b' && ch.children) return ch.children.join('').trim();
+                      return '';
+                    }).join(' ').trim();
+                  }
+
+                  // description text after <br/>
+                  let descText = '';
+                  const brIndex = detailsNode.children.findIndex(c => c.tag === 'br');
+                  if (brIndex !== -1) {
+                    for (let j = brIndex + 1; j < detailsNode.children.length; j++) {
+                      const c = detailsNode.children[j];
+                      if (typeof c === 'string') descText += c.trim() + ' ';
+                      else if (c.children) {
+                        descText += c.children.filter(x => typeof x === 'string').join(' ') + ' ';
+                      }
+                    }
+                  }
+
+                  policies.push({summary: summaryText, description: descText.trim()});
+                }
+              }
+            }
+
+            // Print policies in desired format
+            policies.forEach(p => {
+              console.log(`“${p.summary}” : ${p.description}\n`);
+            });
           "
