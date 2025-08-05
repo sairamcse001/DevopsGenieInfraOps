@@ -42,13 +42,13 @@ jobs:
         run: |
           echo "Sending Infracost comment and JSON to public ServiceNow API..."
 
-          COMMENT_CONTENT=$(cat comment.html | jq -Rs .)  # JSON string
+          INFRACOST_JSON=$(cat infracost-output.json)
+
 
           PAYLOAD=$(jq -n \
-            --arg comment "$COMMENT_CONTENT" \
-            '{insta_comments: $comment}')
+            --argjson infracost "$INFRACOST_JSON" \
+            '{ infrast_json: $infracost}')
 
           curl -s -X POST "$SERVICENOW_API_URL" \
             -H "Content-Type: application/json" \
             -d "$PAYLOAD"
-
