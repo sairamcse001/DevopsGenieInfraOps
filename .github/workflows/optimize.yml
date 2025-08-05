@@ -48,7 +48,7 @@ jobs:
 
           PAYLOAD=$(jq -n \
             --arg comment "$COMMENT_CONTENT" \
-            '{insta_comments: $comment')
+            '{insta_comments: $comment}')
 
           curl -s -X POST "$SERVICENOW_API_URL" \
             -H "Content-Type: application/json" \
