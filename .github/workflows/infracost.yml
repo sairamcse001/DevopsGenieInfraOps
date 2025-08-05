@@ -1,0 +1,36 @@
+name: Infracost PR Analysis
+
+on:
+  pull_request:
+    paths:
+      - 'terraform/**'
+
+jobs:
+  infracost:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v2
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Run Infracost and generate JSON
+        run: |
+          infracost breakdown \
+            --path=terraform \
+            --format=json \
+            --out-file=infracost-output.json
+
+      - name: Print GitHub PR and Infracost Output
+        run: |
+          pr_number="${{ github.event.pull_request.number }}"
+          repo="${{ github.repository }}"
+
+          echo "📦 Repository: $repo"
+          echo "🔢 PR Number: $pr_number"
+          echo "💸 Infracost Output:"
+          cat infracost-output.json
