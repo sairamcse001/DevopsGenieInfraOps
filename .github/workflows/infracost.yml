@@ -78,7 +78,7 @@ jobs:
             let html = fs.readFileSync('comment.html', 'utf8');
 
             // Remove markdown comment line at the start if present
-            const markdownCommentRegex = /^\\[\\/\\/\\]: <> \\(.*?\\)\\n?/;
+            const markdownCommentRegex = /^\[\/\/\]: <> \(.*?\)\n?/;
             const cleanedHtml = html.replace(markdownCommentRegex, '');
 
             const \$ = cheerio.load(cleanedHtml, { decodeEntities: false });
