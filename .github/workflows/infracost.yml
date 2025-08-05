@@ -20,7 +20,7 @@ jobs:
       - name: Setup Infracost
         uses: infracost/actions/setup@v2
         with:
-          api-key: ${{ secrets.INFRACOST_API_KEY }}
+          api-key: ics_v1_0EYAc3KF1KDTdwcVGiFemY_NTLN0pGEqFspCecg7pUoHjraFjhLRwtik5Lkfj6dOtnBHH45T
 
       - name: Run Infracost and generate JSON
         run: |
