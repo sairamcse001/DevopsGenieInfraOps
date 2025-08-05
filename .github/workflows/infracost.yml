@@ -64,15 +64,9 @@ jobs:
             exit 1
           fi
 
-          echo "$infracost_comment" > comment.html
-          echo "------ BEGIN Infracost comment HTML ------"
-          echo "$infracost_comment"
-          echo "------- END Infracost comment HTML -------"
-
-          # Set output using environment files (new syntax)
           echo "comment_file=comment.html" >> $GITHUB_OUTPUT
 
-      - name: Parse Infracost Comment HTML to JSON and print raw HTML
+      - name: Parse Infracost Comment HTML to JSON and print FinOps table only
         run: |
           npm install cheerio
 
@@ -81,15 +75,27 @@ jobs:
             const cheerio = require('cheerio');
             let html = fs.readFileSync('comment.html', 'utf8');
 
-            // Remove markdown comment line at the start if present
-            const markdownCommentRegex = /^\[\/\/\]: <> \(.*?\)\n?/;
+            const markdownCommentRegex = /^\\[\\/\\/\\]: <> \\(.*?\\)\\n?/;
             const cleanedHtml = html.replace(markdownCommentRegex, '');
 
-            // Print raw cleaned HTML
             console.log('📄 Raw cleaned HTML content:');
             console.log(cleanedHtml);
 
             const \$ = cheerio.load(cleanedHtml, { decodeEntities: false });
+
+            let finOpsTable = null;
+            \$('table').each((_, table) => {
+              const header = \$(table).find('tr').first().text().trim();
+              if (header.includes('FinOps policies')) {
+                finOpsTable = table;
+                return false;
+              }
+            });
+
+            if (!finOpsTable) {
+              console.error('❌ FinOps policies table not found');
+              process.exit(0);
+            }
 
             function parseNode(node) {
               if (node.type === 'text') {
@@ -110,10 +116,9 @@ jobs:
               return null;
             }
 
-            const rootNode = \$('body').get(0) || \$.root().get(0);
-            const json = parseNode(rootNode);
+            const json = parseNode(finOpsTable);
 
-            fs.writeFileSync('comment.json', JSON.stringify(json, null, 2));
-            console.log('Parsed Infracost comment to comment.json');
+            fs.writeFileSync('finops-comment.json', JSON.stringify(json, null, 2));
+            console.log('✅ Parsed FinOps policies table saved to finops-comment.json');
             console.log(JSON.stringify(json, null, 2));
           "
