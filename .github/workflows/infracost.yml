@@ -1,11 +1,10 @@
+
+
 name: Infracost PR Analysis
 
 on:
   issue_comment:
     types: [created]
-  pull_request:
-    paths:
-      - 'terraform/**'
   workflow_dispatch:
 
 jobs:
@@ -55,12 +54,19 @@ jobs:
           comments=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/issues/$pr_number/comments")
 
+          echo "$comments"
           infracost_comment=$(echo "$comments" | jq -r '.[0].body')
-
+          
+          echo "$infracost_comment"
           if [ -z "$infracost_comment" ]; then
             echo "No Infracost bot comment found."
             exit 1
           fi
+
+          echo "$infracost_comment" > comment.html
+          echo "------ BEGIN Infracost comment HTML ------"
+          echo "$infracost_comment"
+          echo "------- END Infracost comment HTML -------"
 
           # Set output using environment files (new syntax)
           echo "comment_file=comment.html" >> $GITHUB_OUTPUT
